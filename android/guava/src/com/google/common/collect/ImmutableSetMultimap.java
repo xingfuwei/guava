@@ -42,6 +42,10 @@ import org.checkerframework.checker.nullness.compatqual.NullableDecl;
  * A {@link SetMultimap} whose contents will never change, with many other important properties
  * detailed at {@link ImmutableCollection}.
  *
+ * <p><b>Warning:</b> As in all {@link SetMultimap}s, do not modify either a key <i>or a value</i>
+ * of a {@code ImmutableSetMultimap} in a way that affects its {@link Object#equals} behavior.
+ * Undefined behavior and bugs will result.
+ *
  * <p>See the Guava User Guide article on <a href=
  * "https://github.com/google/guava/wiki/ImmutableCollectionsExplained"> immutable collections</a>.
  *
@@ -52,7 +56,11 @@ import org.checkerframework.checker.nullness.compatqual.NullableDecl;
 public class ImmutableSetMultimap<K, V> extends ImmutableMultimap<K, V>
     implements SetMultimap<K, V> {
 
-  /** Returns the empty multimap. */
+  /**
+   * Returns the empty multimap.
+   *
+   * <p><b>Performance note:</b> the instance returned is a singleton.
+   */
   // Casting is safe because the multimap will never hold any elements.
   @SuppressWarnings("unchecked")
   public static <K, V> ImmutableSetMultimap<K, V> of() {

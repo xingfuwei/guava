@@ -41,12 +41,28 @@ import java.util.logging.Logger;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
- * A builder of {@link LoadingCache} and {@link Cache} instances having any combination of the
- * following features:
+ * A builder of {@link LoadingCache} and {@link Cache} instances.
+ *
+ * <h2>Prefer <a href="https://github.com/ben-manes/caffeine/wiki">Caffeine</a> over {@code
+ * common.cache}</h2>
+ *
+ * <p>The successor to {@code common.cache} is <a
+ * href="https://github.com/ben-manes/caffeine/wiki">Caffeine</a>. Its API is designed to make it a
+ * nearly drop-in replacement (though it requires Java 8 APIs). (Its equivalent to {@code
+ * CacheBuilder} is its <a
+ * href="https://www.javadoc.io/doc/com.github.ben-manes.caffeine/caffeine/latest/com/github/benmanes/caffeine/cache/Caffeine.html">{@code
+ * Caffeine}</a> class.) It offers better performance, more features (including asynchronous
+ * loading), and fewer <a
+ * href="https://github.com/google/guava/issues?q=is%3Aopen+is%3Aissue+label%3Apackage%3Dcache+label%3Atype%3Ddefect">bugs</a>.
+ *
+ * <h2>More on {@code CacheBuilder}</h2>
+ *
+ * {@code CacheBuilder} builds caches with any combination of the following features:
  *
  * <ul>
  *   <li>automatic loading of entries into the cache
- *   <li>least-recently-used eviction when a maximum size is exceeded
+ *   <li>least-recently-used eviction when a maximum size is exceeded (note that the cache is
+ *       divided into segments, each of which does LRU internally)
  *   <li>time-based expiration of entries, measured since last access or last write
  *   <li>keys automatically wrapped in {@code WeakReference}
  *   <li>values automatically wrapped in {@code WeakReference} or {@code SoftReference}
@@ -648,7 +664,7 @@ public final class CacheBuilder<K, V> {
    *     removed
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the time to live or time to idle was already set
+   * @throws IllegalStateException if {@link #expireAfterWrite} was already set
    * @throws ArithmeticException for durations greater than +/- approximately 292 years
    * @since 25.0
    */
@@ -679,7 +695,7 @@ public final class CacheBuilder<K, V> {
    * @param unit the unit that {@code duration} is expressed in
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the time to live or time to idle was already set
+   * @throws IllegalStateException if {@link #expireAfterWrite} was already set
    */
   @SuppressWarnings("GoodTime") // should accept a java.time.Duration
   public CacheBuilder<K, V> expireAfterWrite(long duration, TimeUnit unit) {
@@ -718,7 +734,7 @@ public final class CacheBuilder<K, V> {
    *     automatically removed
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the time to idle or time to live was already set
+   * @throws IllegalStateException if {@link #expireAfterAccess} was already set
    * @throws ArithmeticException for durations greater than +/- approximately 292 years
    * @since 25.0
    */
@@ -754,7 +770,7 @@ public final class CacheBuilder<K, V> {
    * @param unit the unit that {@code duration} is expressed in
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the time to idle or time to live was already set
+   * @throws IllegalStateException if {@link #expireAfterAccess} was already set
    */
   @SuppressWarnings("GoodTime") // should accept a java.time.Duration
   public CacheBuilder<K, V> expireAfterAccess(long duration, TimeUnit unit) {
@@ -786,9 +802,10 @@ public final class CacheBuilder<K, V> {
    * operations.
    *
    * <p>Currently automatic refreshes are performed when the first stale request for an entry
-   * occurs. The request triggering refresh will make a blocking call to {@link CacheLoader#reload}
-   * and immediately return the new value if the returned future is complete, and the old value
-   * otherwise.
+   * occurs. The request triggering refresh will make a synchronous call to {@link
+   * CacheLoader#reload}
+   * to obtain a future of the new value. If the returned future is already complete, it is returned
+   * immediately. Otherwise, the old value is returned.
    *
    * <p><b>Note:</b> <i>all exceptions thrown during refresh will be logged and then swallowed</i>.
    *
@@ -796,7 +813,7 @@ public final class CacheBuilder<K, V> {
    *     stale, and thus eligible for refresh
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the refresh interval was already set
+   * @throws IllegalStateException if {@link #refreshAfterWrite} was already set
    * @throws ArithmeticException for durations greater than +/- approximately 292 years
    * @since 25.0
    */
@@ -819,7 +836,8 @@ public final class CacheBuilder<K, V> {
    * operations.
    *
    * <p>Currently automatic refreshes are performed when the first stale request for an entry
-   * occurs. The request triggering refresh will make a blocking call to {@link CacheLoader#reload}
+   * occurs. The request triggering refresh will make a synchronous call to {@link
+   * CacheLoader#reload}
    * and immediately return the new value if the returned future is complete, and the old value
    * otherwise.
    *
@@ -833,7 +851,7 @@ public final class CacheBuilder<K, V> {
    * @param unit the unit that {@code duration} is expressed in
    * @return this {@code CacheBuilder} instance (for chaining)
    * @throws IllegalArgumentException if {@code duration} is negative
-   * @throws IllegalStateException if the refresh interval was already set
+   * @throws IllegalStateException if {@link #refreshAfterWrite} was already set
    * @since 11.0
    */
   @GwtIncompatible // To be supported (synchronously).
