@@ -19,7 +19,6 @@ package com.google.common.testing;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.annotations.Beta;
 import com.google.common.annotations.GwtIncompatible;
 import com.google.common.base.Converter;
 import com.google.common.base.Objects;
@@ -68,7 +67,6 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * @author Kevin Bourrillion
  * @since 10.0
  */
-@Beta
 @GwtIncompatible
 public final class NullPointerTester {
 
@@ -497,6 +495,8 @@ public final class NullPointerTester {
     TypeVariable<?> var = (TypeVariable<?>) type;
     AnnotatedType[] bounds = GET_ANNOTATED_BOUNDS.apply(var);
     for (AnnotatedType bound : bounds) {
+      // Until Java 15, the isNullableTypeVariable case here won't help:
+      // https://bugs.openjdk.java.net/browse/JDK-8202469
       if (isNullable(bound.getAnnotations()) || isNullableTypeVariable(bound.getType())) {
         return true;
       }

@@ -265,8 +265,7 @@ public final class ServiceManager implements ServiceManagerBridge {
   @CanIgnoreReturnValue
   public ServiceManager startAsync() {
     for (Service service : services) {
-      State state = service.state();
-      checkState(state == NEW, "Service %s is %s, cannot start it.", service, state);
+      checkState(service.state() == NEW, "Not all services are NEW, cannot start %s", this);
     }
     for (Service service : services) {
       try {
@@ -421,11 +420,12 @@ public final class ServiceManager implements ServiceManagerBridge {
    *
    * @return Map of services and their corresponding startup time, the map entries will be ordered
    *     by startup time.
-   * @since NEXT
+   * @since 31.0
    */
   @J2ObjCIncompatible
   public ImmutableMap<Service, Duration> startupDurations() {
-    return ImmutableMap.copyOf(Maps.transformValues(startupTimes(), Duration::ofMillis));
+    return ImmutableMap.copyOf(
+        Maps.<Service, Long, Duration>transformValues(startupTimes(), Duration::ofMillis));
   }
 
   @Override

@@ -49,8 +49,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * {@code Multiset} operations (exceptions where noted). Null elements are not supported.
  *
  * <p>See the Guava User Guide article on <a href=
- * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#multiset"> {@code
- * Multiset}</a>.
+ * "https://github.com/google/guava/wiki/NewCollectionTypesExplained#multiset">{@code Multiset}</a>.
  *
  * @author Cliff L. Biffle
  * @author mike nonemacher
@@ -88,7 +87,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
     // TODO(schmoe): provide a way to use this class with other (possibly arbitrary)
     // ConcurrentMap implementors. One possibility is to extract most of this class into
     // an AbstractConcurrentMapMultiset.
-    return new ConcurrentHashMultiset<E>(new ConcurrentHashMap<E, AtomicInteger>());
+    return new ConcurrentHashMultiset<>(new ConcurrentHashMap<E, AtomicInteger>());
   }
 
   /**
@@ -121,7 +120,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
    */
   @Beta
   public static <E> ConcurrentHashMultiset<E> create(ConcurrentMap<E, AtomicInteger> countMap) {
-    return new ConcurrentHashMultiset<E>(countMap);
+    return new ConcurrentHashMultiset<>(countMap);
   }
 
   @VisibleForTesting
@@ -170,11 +169,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
   }
 
   @Override
-  /*
-   * Our checker says "found: T[]; required: T[]." That sounds bogus. I discuss a possible reason
-   * for this error in https://github.com/jspecify/checker-framework/issues/10.
-   */
-  @SuppressWarnings("nullness")
+  @SuppressWarnings("nullness") // b/192354773 in our checker affects toArray declarations
   public <T extends @Nullable Object> T[] toArray(T[] array) {
     return snapshot().toArray(array);
   }
@@ -212,7 +207,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
     if (occurrences == 0) {
       return count(element);
     }
-    CollectPreconditions.checkPositive(occurrences, "occurences");
+    CollectPreconditions.checkPositive(occurrences, "occurrences");
 
     while (true) {
       AtomicInteger existingCounter = Maps.safeGet(countMap, element);
@@ -278,7 +273,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
     if (occurrences == 0) {
       return count(element);
     }
-    CollectPreconditions.checkPositive(occurrences, "occurences");
+    CollectPreconditions.checkPositive(occurrences, "occurrences");
 
     AtomicInteger existingCounter = Maps.safeGet(countMap, element);
     if (existingCounter == null) {
@@ -319,7 +314,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
     if (occurrences == 0) {
       return true;
     }
-    CollectPreconditions.checkPositive(occurrences, "occurences");
+    CollectPreconditions.checkPositive(occurrences, "occurrences");
 
     AtomicInteger existingCounter = Maps.safeGet(countMap, element);
     if (existingCounter == null) {
@@ -453,7 +448,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
 
   @Override
   Set<E> createElementSet() {
-    final Set<E> delegate = countMap.keySet();
+    Set<E> delegate = countMap.keySet();
     return new ForwardingSet<E>() {
       @Override
       protected Set<E> delegate() {
@@ -508,12 +503,13 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
   Iterator<Entry<E>> entryIterator() {
     // AbstractIterator makes this fairly clean, but it doesn't support remove(). To support
     // remove(), we create an AbstractIterator, and then use ForwardingIterator to delegate to it.
-    final Iterator<Entry<E>> readOnlyIterator =
+    Iterator<Entry<E>> readOnlyIterator =
         new AbstractIterator<Entry<E>>() {
           private final Iterator<Map.Entry<E, AtomicInteger>> mapEntries =
               countMap.entrySet().iterator();
 
           @Override
+          @CheckForNull
           protected Entry<E> computeNext() {
             while (true) {
               if (!mapEntries.hasNext()) {
@@ -579,11 +575,7 @@ public final class ConcurrentHashMultiset<E> extends AbstractMultiset<E> impleme
     }
 
     @Override
-    /*
-     * Our checker says "found: T[]; required: T[]." That sounds bogus. I discuss a possible reason
-     * for this error in https://github.com/jspecify/checker-framework/issues/10.
-     */
-    @SuppressWarnings("nullness")
+    @SuppressWarnings("nullness") // b/192354773 in our checker affects toArray declarations
     public <T extends @Nullable Object> T[] toArray(T[] array) {
       return snapshot().toArray(array);
     }

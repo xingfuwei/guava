@@ -18,10 +18,11 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
-import com.google.common.annotations.Beta;
 import com.google.common.annotations.GwtCompatible;
+import com.google.common.base.CharMatcher;
 import com.google.common.base.Objects;
 import com.google.common.base.Strings;
+import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.Immutable;
 import java.io.Serializable;
 import javax.annotation.CheckForNull;
@@ -59,7 +60,6 @@ import javax.annotation.CheckForNull;
  * @author Paul Marks
  * @since 10.0
  */
-@Beta
 @Immutable
 @GwtCompatible
 @ElementTypesAreNonnullByDefault
@@ -163,6 +163,7 @@ public final class HostAndPort implements Serializable {
    * @return if parsing was successful, a populated HostAndPort object.
    * @throws IllegalArgumentException if nothing meaningful could be parsed.
    */
+  @CanIgnoreReturnValue // TODO(b/219820829): consider removing
   public static HostAndPort fromString(String hostPortString) {
     checkNotNull(hostPortString);
     String host;
@@ -190,7 +191,10 @@ public final class HostAndPort implements Serializable {
     if (!Strings.isNullOrEmpty(portString)) {
       // Try to parse the whole port string as a number.
       // JDK7 accepts leading plus signs. We don't want to.
-      checkArgument(!portString.startsWith("+"), "Unparseable port number: %s", hostPortString);
+      checkArgument(
+          !portString.startsWith("+") && CharMatcher.ascii().matchesAllOf(portString),
+          "Unparseable port number: %s",
+          hostPortString);
       try {
         port = Integer.parseInt(portString);
       } catch (NumberFormatException e) {
@@ -270,6 +274,7 @@ public final class HostAndPort implements Serializable {
    * @return {@code this}, to enable chaining of calls.
    * @throws IllegalArgumentException if bracketless IPv6 is detected.
    */
+  @CanIgnoreReturnValue
   public HostAndPort requireBracketsForIPv6() {
     checkArgument(!hasBracketlessColons, "Possible bracketless IPv6 literal: %s", host);
     return this;

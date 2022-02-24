@@ -86,7 +86,7 @@ class MapIteratorCache<K, V> {
   V get(Object key) {
     checkNotNull(key);
     V value = getIfCached(key);
-    // TODO(cpovirk): Switch back to a ternary once our checker allows it.
+    // TODO(b/192579700): Use a ternary once it no longer confuses our nullness checker.
     if (value == null) {
       return getWithoutCaching(key);
     } else {
@@ -108,7 +108,7 @@ class MapIteratorCache<K, V> {
     return new AbstractSet<K>() {
       @Override
       public UnmodifiableIterator<K> iterator() {
-        final Iterator<Entry<K, V>> entryIterator = backingMap.entrySet().iterator();
+        Iterator<Entry<K, V>> entryIterator = backingMap.entrySet().iterator();
 
         return new UnmodifiableIterator<K>() {
           @Override

@@ -335,19 +335,26 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
   @Override
   public abstract UnmodifiableIterator<E> iterator();
 
-  @LazyInit @RetainedWith @CheckForNull private transient ImmutableList<E> asList;
+  @GwtCompatible
+  abstract static class CachingAsList<E> extends ImmutableSet<E> {
+    @LazyInit @RetainedWith @CheckForNull private transient ImmutableList<E> asList;
 
-  @Override
-  public ImmutableList<E> asList() {
-    ImmutableList<E> result = asList;
-    return (result == null) ? asList = createAsList() : result;
+    @Override
+    public ImmutableList<E> asList() {
+      ImmutableList<E> result = asList;
+      if (result == null) {
+        return asList = createAsList();
+      } else {
+        return result;
+      }
+    }
+
+    ImmutableList<E> createAsList() {
+      return new RegularImmutableAsList<E>(this, toArray());
+    }
   }
 
-  ImmutableList<E> createAsList() {
-    return new RegularImmutableAsList<E>(this, toArray());
-  }
-
-  abstract static class Indexed<E> extends ImmutableSet<E> {
+  abstract static class Indexed<E> extends CachingAsList<E> {
     abstract E get(int index);
 
     @Override
@@ -470,11 +477,15 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
     boolean forceCopy;
 
     public Builder() {
-      this(DEFAULT_INITIAL_CAPACITY);
+      this(0);
     }
 
     Builder(int capacity) {
-      impl = new RegularSetBuilderImpl<E>(capacity);
+      if (capacity > 0) {
+        impl = new RegularSetBuilderImpl<E>(capacity);
+      } else {
+        impl = EmptySetBuilderImpl.instance();
+      }
     }
 
     Builder(@SuppressWarnings("unused") boolean subclass) {
@@ -566,12 +577,13 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
   /** Swappable internal implementation of an ImmutableSet.Builder. */
   private abstract static class SetBuilderImpl<E> {
     // The first `distinct` elements are non-null.
-    @Nullable E[] dedupedElements;
+    // Since we can never access null elements, we don't mark this nullable.
+    E[] dedupedElements;
     int distinct;
 
     @SuppressWarnings("unchecked")
     SetBuilderImpl(int expectedCapacity) {
-      this.dedupedElements = (@Nullable E[]) new @Nullable Object[expectedCapacity];
+      this.dedupedElements = (E[]) new Object[expectedCapacity];
       this.distinct = 0;
     }
 
@@ -635,6 +647,34 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
     abstract ImmutableSet<E> build();
   }
 
+  private static final class EmptySetBuilderImpl<E> extends SetBuilderImpl<E> {
+    private static final EmptySetBuilderImpl<Object> INSTANCE = new EmptySetBuilderImpl<>();
+
+    @SuppressWarnings("unchecked")
+    static <E> SetBuilderImpl<E> instance() {
+      return (SetBuilderImpl<E>) INSTANCE;
+    }
+
+    private EmptySetBuilderImpl() {
+      super(0);
+    }
+
+    @Override
+    SetBuilderImpl<E> add(E e) {
+      return new RegularSetBuilderImpl<E>(Builder.DEFAULT_INITIAL_CAPACITY).add(e);
+    }
+
+    @Override
+    SetBuilderImpl<E> copy() {
+      return this;
+    }
+
+    @Override
+    ImmutableSet<E> build() {
+      return ImmutableSet.of();
+    }
+  }
+
   // We use power-of-2 tables, and this is the highest int that's a power of 2
   static final int MAX_TABLE_SIZE = Ints.MAX_POWER_OF_TWO;
 
@@ -676,22 +716,22 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
    * JdkBackedSetBuilderImpl.
    */
   private static final class RegularSetBuilderImpl<E> extends SetBuilderImpl<E> {
-    private @Nullable Object[] hashTable;
+    // null until at least two elements are present
+    private @Nullable Object @Nullable [] hashTable;
     private int maxRunBeforeFallback;
     private int expandTableThreshold;
     private int hashCode;
 
     RegularSetBuilderImpl(int expectedCapacity) {
       super(expectedCapacity);
-      int tableSize = chooseTableSize(expectedCapacity);
-      this.hashTable = new @Nullable Object[tableSize];
-      this.maxRunBeforeFallback = maxRunBeforeFallback(tableSize);
-      this.expandTableThreshold = (int) (DESIRED_LOAD_FACTOR * tableSize);
+      this.hashTable = null;
+      this.maxRunBeforeFallback = 0;
+      this.expandTableThreshold = 0;
     }
 
     RegularSetBuilderImpl(RegularSetBuilderImpl<E> toCopy) {
       super(toCopy);
-      this.hashTable = Arrays.copyOf(toCopy.hashTable, toCopy.hashTable.length);
+      this.hashTable = (toCopy.hashTable == null) ? null : toCopy.hashTable.clone();
       this.maxRunBeforeFallback = toCopy.maxRunBeforeFallback;
       this.expandTableThreshold = toCopy.expandTableThreshold;
       this.hashCode = toCopy.hashCode;
@@ -700,6 +740,22 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
     @Override
     SetBuilderImpl<E> add(E e) {
       checkNotNull(e);
+      if (hashTable == null) {
+        if (distinct == 0) {
+          addDedupedElement(e);
+          return this;
+        } else {
+          ensureTableCapacity(dedupedElements.length);
+          E elem = dedupedElements[0];
+          distinct--;
+          return insertInHashTable(elem).add(e);
+        }
+      }
+      return insertInHashTable(e);
+    }
+
+    private SetBuilderImpl<E> insertInHashTable(E e) {
+      requireNonNull(hashTable);
       int eHash = e.hashCode();
       int i0 = Hashing.smear(eHash);
       int mask = hashTable.length - 1;
@@ -727,6 +783,9 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
 
     @Override
     SetBuilderImpl<E> review() {
+      if (hashTable == null) {
+        return this;
+      }
       int targetTableSize = chooseTableSize(distinct);
       if (targetTableSize * 2 < hashTable.length) {
         hashTable = rebuildHashTable(targetTableSize, dedupedElements, distinct);
@@ -757,13 +816,13 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
               (distinct == dedupedElements.length)
                   ? dedupedElements
                   : Arrays.copyOf(dedupedElements, distinct);
-          return new RegularImmutableSet<E>(elements, hashCode, hashTable, hashTable.length - 1);
+          return new RegularImmutableSet<E>(
+              elements, hashCode, requireNonNull(hashTable), hashTable.length - 1);
       }
     }
 
     /** Builds a new open-addressed hash table from the first n objects in elements. */
-    static @Nullable Object[] rebuildHashTable(
-        int newTableSize, @Nullable Object[] elements, int n) {
+    static @Nullable Object[] rebuildHashTable(int newTableSize, Object[] elements, int n) {
       @Nullable Object[] hashTable = new @Nullable Object[newTableSize];
       int mask = hashTable.length - 1;
       for (int i = 0; i < n; i++) {
@@ -782,12 +841,18 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E> implements 
     }
 
     void ensureTableCapacity(int minCapacity) {
-      if (minCapacity > expandTableThreshold && hashTable.length < MAX_TABLE_SIZE) {
-        int newTableSize = hashTable.length * 2;
+      int newTableSize;
+      if (hashTable == null) {
+        newTableSize = chooseTableSize(minCapacity);
+        hashTable = new Object[newTableSize];
+      } else if (minCapacity > expandTableThreshold && hashTable.length < MAX_TABLE_SIZE) {
+        newTableSize = hashTable.length * 2;
         hashTable = rebuildHashTable(newTableSize, dedupedElements, distinct);
-        maxRunBeforeFallback = maxRunBeforeFallback(newTableSize);
-        expandTableThreshold = (int) (DESIRED_LOAD_FACTOR * newTableSize);
+      } else {
+        return;
       }
+      maxRunBeforeFallback = maxRunBeforeFallback(newTableSize);
+      expandTableThreshold = (int) (DESIRED_LOAD_FACTOR * newTableSize);
     }
 
     /**

@@ -163,13 +163,13 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
         orderedNodeConnections = null;
         break;
       case STABLE:
-        orderedNodeConnections = new ArrayList<NodeConnection<N>>();
+        orderedNodeConnections = new ArrayList<>();
         break;
       default:
         throw new AssertionError(incidentEdgeOrder.type());
     }
 
-    return new DirectedGraphConnections<N, V>(
+    return new DirectedGraphConnections<>(
         /* adjacentNodeValues = */ new HashMap<N, Object>(initialCapacity, INNER_LOAD_FACTOR),
         orderedNodeConnections,
         /* predecessorCount = */ 0,
@@ -239,10 +239,11 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
       return new AbstractSet<N>() {
         @Override
         public UnmodifiableIterator<N> iterator() {
-          final Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
-          final Set<N> seenNodes = new HashSet<>();
+          Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
+          Set<N> seenNodes = new HashSet<>();
           return new AbstractIterator<N>() {
             @Override
+            @CheckForNull
             protected N computeNext() {
               while (nodeConnections.hasNext()) {
                 NodeConnection<N> nodeConnection = nodeConnections.next();
@@ -275,9 +276,10 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
       @Override
       public UnmodifiableIterator<N> iterator() {
         if (orderedNodeConnections == null) {
-          final Iterator<Entry<N, Object>> entries = adjacentNodeValues.entrySet().iterator();
+          Iterator<Entry<N, Object>> entries = adjacentNodeValues.entrySet().iterator();
           return new AbstractIterator<N>() {
             @Override
+            @CheckForNull
             protected N computeNext() {
               while (entries.hasNext()) {
                 Entry<N, Object> entry = entries.next();
@@ -289,9 +291,10 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
             }
           };
         } else {
-          final Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
+          Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
           return new AbstractIterator<N>() {
             @Override
+            @CheckForNull
             protected N computeNext() {
               while (nodeConnections.hasNext()) {
                 NodeConnection<N> nodeConnection = nodeConnections.next();
@@ -323,9 +326,10 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
       @Override
       public UnmodifiableIterator<N> iterator() {
         if (orderedNodeConnections == null) {
-          final Iterator<Entry<N, Object>> entries = adjacentNodeValues.entrySet().iterator();
+          Iterator<Entry<N, Object>> entries = adjacentNodeValues.entrySet().iterator();
           return new AbstractIterator<N>() {
             @Override
+            @CheckForNull
             protected N computeNext() {
               while (entries.hasNext()) {
                 Entry<N, Object> entry = entries.next();
@@ -337,9 +341,10 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
             }
           };
         } else {
-          final Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
+          Iterator<NodeConnection<N>> nodeConnections = orderedNodeConnections.iterator();
           return new AbstractIterator<N>() {
             @Override
+            @CheckForNull
             protected N computeNext() {
               while (nodeConnections.hasNext()) {
                 NodeConnection<N> nodeConnection = nodeConnections.next();
@@ -366,48 +371,36 @@ final class DirectedGraphConnections<N, V> implements GraphConnections<N, V> {
   }
 
   @Override
-  public Iterator<EndpointPair<N>> incidentEdgeIterator(final N thisNode) {
+  public Iterator<EndpointPair<N>> incidentEdgeIterator(N thisNode) {
     checkNotNull(thisNode);
 
-    final Iterator<EndpointPair<N>> resultWithDoubleSelfLoop;
+    Iterator<EndpointPair<N>> resultWithDoubleSelfLoop;
     if (orderedNodeConnections == null) {
       resultWithDoubleSelfLoop =
           Iterators.concat(
               Iterators.transform(
                   predecessors().iterator(),
-                  new Function<N, EndpointPair<N>>() {
-                    @Override
-                    public EndpointPair<N> apply(N predecessor) {
-                      return EndpointPair.ordered(predecessor, thisNode);
-                    }
-                  }),
+                  (N predecessor) -> EndpointPair.ordered(predecessor, thisNode)),
               Iterators.transform(
                   successors().iterator(),
-                  new Function<N, EndpointPair<N>>() {
-                    @Override
-                    public EndpointPair<N> apply(N successor) {
-                      return EndpointPair.ordered(thisNode, successor);
-                    }
-                  }));
+                  (N successor) -> EndpointPair.ordered(thisNode, successor)));
     } else {
       resultWithDoubleSelfLoop =
           Iterators.transform(
               orderedNodeConnections.iterator(),
-              new Function<NodeConnection<N>, EndpointPair<N>>() {
-                @Override
-                public EndpointPair<N> apply(NodeConnection<N> connection) {
-                  if (connection instanceof NodeConnection.Succ) {
-                    return EndpointPair.ordered(thisNode, connection.node);
-                  } else {
-                    return EndpointPair.ordered(connection.node, thisNode);
-                  }
+              (NodeConnection<N> connection) -> {
+                if (connection instanceof NodeConnection.Succ) {
+                  return EndpointPair.ordered(thisNode, connection.node);
+                } else {
+                  return EndpointPair.ordered(connection.node, thisNode);
                 }
               });
     }
 
-    final AtomicBoolean alreadySeenSelfLoop = new AtomicBoolean(false);
+    AtomicBoolean alreadySeenSelfLoop = new AtomicBoolean(false);
     return new AbstractIterator<EndpointPair<N>>() {
       @Override
+      @CheckForNull
       protected EndpointPair<N> computeNext() {
         while (resultWithDoubleSelfLoop.hasNext()) {
           EndpointPair<N> edge = resultWithDoubleSelfLoop.next();

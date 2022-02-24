@@ -53,10 +53,15 @@ import javax.annotation.CheckForNull;
 @Immutable
 @ElementTypesAreNonnullByDefault
 final class Murmur3_32HashFunction extends AbstractHashFunction implements Serializable {
-  static final HashFunction MURMUR3_32 = new Murmur3_32HashFunction(0);
+  static final HashFunction MURMUR3_32 =
+      new Murmur3_32HashFunction(0, /* supplementaryPlaneFix= */ false);
+  static final HashFunction MURMUR3_32_FIXED =
+      new Murmur3_32HashFunction(0, /* supplementaryPlaneFix= */ true);
 
+  // We can include the non-BMP fix here because Hashing.goodFastHash stresses that the hash is a
+  // temporary-use one. Therefore it shouldn't be persisted.
   static final HashFunction GOOD_FAST_HASH_32 =
-      new Murmur3_32HashFunction(Hashing.GOOD_FAST_HASH_SEED);
+      new Murmur3_32HashFunction(Hashing.GOOD_FAST_HASH_SEED, /* supplementaryPlaneFix= */ true);
 
   private static final int CHUNK_SIZE = 4;
 
@@ -64,9 +69,11 @@ final class Murmur3_32HashFunction extends AbstractHashFunction implements Seria
   private static final int C2 = 0x1b873593;
 
   private final int seed;
+  private final boolean supplementaryPlaneFix;
 
-  Murmur3_32HashFunction(int seed) {
+  Murmur3_32HashFunction(int seed, boolean supplementaryPlaneFix) {
     this.seed = seed;
+    this.supplementaryPlaneFix = supplementaryPlaneFix;
   }
 
   @Override
@@ -88,7 +95,7 @@ final class Murmur3_32HashFunction extends AbstractHashFunction implements Seria
   public boolean equals(@CheckForNull Object object) {
     if (object instanceof Murmur3_32HashFunction) {
       Murmur3_32HashFunction other = (Murmur3_32HashFunction) object;
-      return seed == other.seed;
+      return seed == other.seed && supplementaryPlaneFix == other.supplementaryPlaneFix;
     }
     return false;
   }
@@ -191,6 +198,9 @@ final class Murmur3_32HashFunction extends AbstractHashFunction implements Seria
           }
           i++;
           buffer |= codePointToFourUtf8Bytes(codePoint) << shift;
+          if (supplementaryPlaneFix) { // bug compatibility: earlier versions did not have this add
+            shift += 32;
+          }
           len += 4;
         }
 
@@ -392,20 +402,22 @@ final class Murmur3_32HashFunction extends AbstractHashFunction implements Seria
   }
 
   private static long codePointToFourUtf8Bytes(int codePoint) {
-    return (((0xFL << 4) | (codePoint >>> 18)) & 0xFF)
+    // codePoint has at most 21 bits
+    return ((0xFL << 4) | (codePoint >>> 18))
         | ((0x80L | (0x3F & (codePoint >>> 12))) << 8)
         | ((0x80L | (0x3F & (codePoint >>> 6))) << 16)
         | ((0x80L | (0x3F & codePoint)) << 24);
   }
 
   private static long charToThreeUtf8Bytes(char c) {
-    return (((0xF << 5) | (c >>> 12)) & 0xFF)
+    return ((0x7L << 5) | (c >>> 12))
         | ((0x80 | (0x3F & (c >>> 6))) << 8)
         | ((0x80 | (0x3F & c)) << 16);
   }
 
   private static long charToTwoUtf8Bytes(char c) {
-    return (((0xF << 6) | (c >>> 6)) & 0xFF) | ((0x80 | (0x3F & c)) << 8);
+    // c has at most 11 bits
+    return ((0x3L << 6) | (c >>> 6)) | ((0x80 | (0x3F & c)) << 8);
   }
 
   private static final long serialVersionUID = 0L;

@@ -156,7 +156,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * <h3>See also</h3>
  *
  * <p>See the Guava User Guide article on <a href=
- * "https://github.com/google/guava/wiki/ImmutableCollectionsExplained"> immutable collections</a>.
+ * "https://github.com/google/guava/wiki/ImmutableCollectionsExplained">immutable collections</a>.
  *
  * @since 2.0
  */
@@ -198,8 +198,7 @@ public abstract class ImmutableCollection<E> extends AbstractCollection<E> imple
   /*
    * This suppression is here for two reasons:
    *
-   * 1. Our checker says "found: T[]; required: T[]." That sounds bogus. I discuss a possible reason
-   * for this error in https://github.com/jspecify/checker-framework/issues/10.
+   * 1. b/192354773 in our checker affects toArray declarations.
    *
    * 2. `other[size] = null` is unsound. We could "fix" this by requiring callers to pass in an
    * array with a nullable element type. But probably they usually want an array with a non-nullable

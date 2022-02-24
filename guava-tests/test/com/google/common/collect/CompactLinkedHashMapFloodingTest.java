@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Guava Authors
+ * Copyright (C) 2012 The Guava Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -12,14 +12,16 @@
  * the License.
  */
 
-package com.google.common.util.concurrent;
+package com.google.common.collect;
 
-import static java.lang.annotation.ElementType.CONSTRUCTOR;
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.TYPE;
+import java.util.Map;
 
-import java.lang.annotation.Target;
-
-@Target({METHOD, CONSTRUCTOR, TYPE})
-@ElementTypesAreNonnullByDefault
-@interface IgnoreJRERequirement {}
+public class CompactLinkedHashMapFloodingTest
+    extends AbstractHashFloodingTest<Map<Object, Object>> {
+  public CompactLinkedHashMapFloodingTest() {
+    super(
+        ImmutableList.of(Construction.mapFromKeys(CompactLinkedHashMap::create)),
+        n -> n * Math.log(n),
+        ImmutableList.of(QueryOp.MAP_GET));
+  }
+}

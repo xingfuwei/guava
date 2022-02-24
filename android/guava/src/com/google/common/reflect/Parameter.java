@@ -22,9 +22,14 @@ import com.google.common.collect.ImmutableList;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import javax.annotation.CheckForNull;
+import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * Represents a method or constructor parameter.
+ *
+ * <p><b>Note:</b> Since Java 8 introduced {@link java.lang.reflect.Parameter} to represent method
+ * and constructor parameters, this class is no longer necessary. We intend to deprecate it in a
+ * future version.
  *
  * @author Ben Yu
  * @since 14.0
@@ -102,7 +107,11 @@ public final class Parameter implements AnnotatedElement {
   /** @since 18.0 */
   // @Override on JDK8
   public <A extends Annotation> A[] getDeclaredAnnotationsByType(Class<A> annotationType) {
-    return FluentIterable.from(annotations).filter(annotationType).toArray(annotationType);
+    @Nullable
+    A[] result = FluentIterable.from(annotations).filter(annotationType).toArray(annotationType);
+    @SuppressWarnings("nullness") // safe because the input list contains no nulls
+    A[] cast = (A[]) result;
+    return cast;
   }
 
   @Override

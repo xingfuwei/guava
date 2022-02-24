@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.annotations.GwtCompatible;
 import com.google.errorprone.annotations.CanIgnoreReturnValue;
 import com.google.errorprone.annotations.ForOverride;
+import com.google.errorprone.annotations.InlineMe;
 import com.google.errorprone.annotations.concurrent.LazyInit;
 import com.google.j2objc.annotations.RetainedWith;
 import java.io.Serializable;
@@ -270,7 +271,7 @@ public abstract class Converter<A, B> implements Function<A, B> {
    * both use cases by using @PolyNull. (By contrast, we can't use @PolyNull for our superinterface
    * (`implements Function<@PolyNull A, @PolyNull B>`), at least as far as I know.)
    */
-  public Iterable<B> convertAll(final Iterable<? extends A> fromIterable) {
+  public Iterable<B> convertAll(Iterable<? extends A> fromIterable) {
     checkNotNull(fromIterable, "fromIterable");
     return new Iterable<B>() {
       @Override
@@ -492,6 +493,7 @@ public abstract class Converter<A, B> implements Function<A, B> {
    */
   @SuppressWarnings("nullness")
   @CheckForNull
+  @InlineMe(replacement = "this.convert(a)")
   public final B apply(@CheckForNull A a) {
     return convert(a);
   }
